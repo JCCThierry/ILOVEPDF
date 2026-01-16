@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Convertir PDF en WORD — Outils PDF</title>
+  <link rel="stylesheet" href="style.css" type="text/css">
+</head>
+<body>
+  <!-- barre de navigation -->
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a class="brand" href="#">
+        <span class="brand__logo" aria-hidden="true">PDF</span>
+        <span class="brand__name">PDF Tools</span>
+      </a>
+      <nav class="nav">
+        <a href="#" class="nav__link">Fusionner PDF</a>
+        <!-- Ajoute d’autres liens au besoin -->
+      </nav>
+      <button class="burger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="container">
+      <section class="hero">
+        <div class="hero__badge">Convertisseur</div>
+        <h1 class="hero__title">Convertir PDF en WORD</h1>
+        <p class="hero__subtitle">
+          Convertissez vos documents PDF en WORD avec une précision incroyable.
+          <span class="hero__note">Alimenté par un moteur de conversion.</span>
+        </p>
+      </section>
+
+<section class="card">
+
+<form id="conversionForm" enctype="multipart/form-data">
+
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone__icon">⬇️</div>
+    <p class="dropzone__title">Déposez le fichier ici</p>
+    <p class="dropzone__hint">ou</p>
+
+    <div class="dropzone__actions">
+
+      <label class="btn btn--primary">
+        Sélectionner un fichier PDF
+        <input id="filePdf" class="sr-only" type="file" accept="application/pdf">
+      </label>
+
+      <label class="btn btn--secondary">
+        Sélectionner un fichier Word
+        <input id="fileWord" class="sr-only" type="file"
+               accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+      </label>
+
+      <label class="btn btn--secondary">
+        Sélectionner un fichier Excel
+        <input id="fileExcel" class="sr-only" type="file"
+               accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      </label>
+
+    </div>
+
+    <p class="dropzone__file" id="fileName">No file chosen</p>
+  </div>
+
+  <div class="conversion-options">
+    <label>Convertir en :</label>
+    <select id="conversionType" class="conversion-select">
+      <option value="pdfToWord">PDF vers Word</option>
+      <option value="wordToPdf">Word vers PDF</option>
+      <option value="wordToExcel">Word vers Excel</option>
+    </select>
+  </div>
+
+  <div class="actions-row">
+ <button id="previewBtn" class="btn btn--secondary" type="button">Aperçu</button>
+    <button id="convertBtn" class="btn btn--primary" type="submit">
+      Convertir
+    </button>
+  </div>
+
+</form>
+     <div class="tips">
+          <!-- Astuces comme avant -->
+          <div class="tip">
+            <div class="tip__dot" aria-hidden="true"></div>
+            <div>
+              <p class="tip__title">Rapide</p>
+              <p class="tip__text">Importez, convertissez, téléchargez en quelques secondes.</p>
+            </div>
+          </div>
+          <!-- Autres tips... -->
+        </div>
+
+</section>
+
+
+      <section class="info">
+        <h2 class="info__title">Comment ça marche ?</h2>
+        <ol class="steps">
+          <li class="step"><span class="step__n">1</span> Choisissez un fichier</li>
+          <li class="step"><span class="step__n">2</span> Choisissez la conversion</li>
+          <li class="step"><span class="step__n">3</span> Lancez et téléchargez</li>
+        </ol>
+      </section>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <p>© 2026 — Votre éditeur PDF</p>
+      <div class="footer__links">
+        <a href="#">Confidentialité</a>
+        <a href="#">Conditions</a>
+        <a href="#">Aide</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+let selectedFile = null;
+
+const fileName = document.getElementById("fileName");
+const conversionType = document.getElementById("conversionType");
+const form = document.getElementById("conversionForm");
+const previewBtn = document.getElementById("previewBtn");
+
+const inputs = {
+  filePdf: document.getElementById("filePdf"),
+  fileWord: document.getElementById("fileWord"),
+  fileExcel: document.getElementById("fileExcel"),
+};
+
+function resetAllInputsExcept(exceptId) {
+  Object.keys(inputs).forEach(id => {
+    if (id !== exceptId) inputs[id].value = "";
+  });
+}
+
+function getFilenameFromDisposition(cd) {
+  if (!cd) return null;
+
+  // filename*=UTF-8''...
+  const m1 = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (m1 && m1[1]) return decodeURIComponent(m1[1].trim());
+
+  // filename="..."
+  const m2 = cd.match(/filename\s*=\s*"([^"]+)"/i);
+  if (m2 && m2[1]) return m2[1].trim();
+
+  // filename=...
+  const m3 = cd.match(/filename\s*=\s*([^;]+)/i);
+  if (m3 && m3[1]) return m3[1].trim();
+
+  return null;
+}
+
+function expectedExt(conv) {
+  if (conv === "pdfToWord") return ".docx";
+  if (conv === "wordToPdf") return ".pdf";
+  if (conv === "wordToExcel") return ".xlsx";
+  if (conv === "pdfToExcel") return ".xlsx";
+  return "";
+}
+
+function baseName(name) {
+  const i = name.lastIndexOf(".");
+  return (i > 0) ? name.substring(0, i) : name;
+}
+
+function validateSelectedFile(conv, file) {
+  if (!file) return "Veuillez sélectionner un fichier";
+
+  const name = file.name.toLowerCase();
+
+  if (conv === "pdfToWord" || conv === "pdfToExcel") {
+    if (!name.endsWith(".pdf")) return "Erreur : vous devez sélectionner un fichier PDF";
+  }
+
+  if (conv === "wordToPdf" || conv === "wordToExcel") {
+    if (!(name.endsWith(".doc") || name.endsWith(".docx")))
+      return "Erreur : vous devez sélectionner un fichier Word";
+  }
+
+  return null;
+}
+
+// Quand user chwazi yon fichye (PDF/Word/Excel)
+["filePdf", "fileWord", "fileExcel"].forEach(id => {
+  inputs[id].addEventListener("change", e => {
+    resetAllInputsExcept(id);
+    selectedFile = e.target.files[0] || null;
+    fileName.textContent = selectedFile ? selectedFile.name : "No file chosen";
+  });
+});
+
+// SUBMIT: Convertir
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  const conv = conversionType.value;
+  const err = validateSelectedFile(conv, selectedFile);
+  if (err) { alert(err); return; }
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+  formData.append("conversionType", conv);
+
+  try {
+    const res = await fetch("convert", { method: "POST", body: formData });
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      alert("Erreur lors de la conversion\n" + msg);
+      return;
+    }
+
+    const blob = await res.blob();
+    const cd = res.headers.get("Content-Disposition");
+    let filename = getFilenameFromDisposition(cd);
+
+    // fallback si serveur pa voye header
+    if (!filename) {
+      filename = baseName(selectedFile.name) + expectedExt(conv);
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+
+  } catch (e2) {
+    alert("Erreur réseau lors de la conversion");
+  }
+});
+
+// PREVIEW: Aperçu (ouvri nouvo tab)
+previewBtn.addEventListener("click", async () => {
+  const conv = conversionType.value;
+  const err = validateSelectedFile(conv, selectedFile);
+  if (err) { alert(err); return; }
+
+  const formData = new FormData();
+  formData.append("file", selectedFile);
+  formData.append("conversionType", conv);
+
+  try {
+    const res = await fetch("preview", { method: "POST", body: formData });
+
+    if (!res.ok) {
+      const msg = await res.text().catch(() => "");
+      alert("Erreur aperçu\n" + msg);
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    // pa revoke touswit sinon tab la ka pa gen tan chaje
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+
+  } catch (e2) {
+    alert("Erreur réseau lors de l’aperçu");
+  }
+});
+</script>
+
+
+</body>
+</html>
