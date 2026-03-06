@@ -80,9 +80,9 @@
 
   <div class="actions-row">
  <button id="previewBtn" class="btn btn--secondary" type="button">Aperçu</button>
-    <button id="convertBtn" class="btn btn--primary" type="submit">
-      Convertir
-    </button>
+   <button id="convertBtn" class="btn btn--primary" type="button">Convertir</button>
+
+
   </div>
 
 </form>
@@ -125,11 +125,20 @@
   </footer>
 
   <script>
+      console.log("UI VERSION = 2026-TEST-1");
+
 let selectedFile = null;
 
 const fileName = document.getElementById("fileName");
 const conversionType = document.getElementById("conversionType");
 const form = document.getElementById("conversionForm");
+// BLOQUER TOUT SUBMIT (meme si Enter)
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  return false;
+}, true);
+
 const previewBtn = document.getElementById("previewBtn");
 
 const inputs = {
@@ -202,9 +211,9 @@ function validateSelectedFile(conv, file) {
 });
 
 // SUBMIT: Convertir
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
+const convertBtn = document.getElementById("convertBtn");
 
+convertBtn.addEventListener("click", async () => {
   const conv = conversionType.value;
   const err = validateSelectedFile(conv, selectedFile);
   if (err) { alert(err); return; }
@@ -213,35 +222,22 @@ form.addEventListener("submit", async (e) => {
   formData.append("file", selectedFile);
   formData.append("conversionType", conv);
 
-  try {
-    const res = await fetch("convert", { method: "POST", body: formData });
+  const res = await fetch("convert", {
+    method: "POST",
+    body: formData,
+    headers: { "Accept": "application/json" }
+  });
 
-    if (!res.ok) {
-      const msg = await res.text().catch(() => "");
-      alert("Erreur lors de la conversion\n" + msg);
-      return;
-    }
-
-    const blob = await res.blob();
-    const cd = res.headers.get("Content-Disposition");
-    let filename = getFilenameFromDisposition(cd);
-
-    // fallback si serveur pa voye header
-    if (!filename) {
-      filename = baseName(selectedFile.name) + expectedExt(conv);
-    }
-
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-
-  } catch (e2) {
-    alert("Erreur réseau lors de la conversion");
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    alert("Erreur lors de la conversion\n" + msg);
+    return;
   }
+
+  const data = await res.json();
+  window.location.href = "result.jsp?token=" + encodeURIComponent(data.token);
 });
+
 
 // PREVIEW: Aperçu (ouvri nouvo tab)
 previewBtn.addEventListener("click", async () => {
@@ -272,6 +268,7 @@ previewBtn.addEventListener("click", async () => {
     alert("Erreur réseau lors de l’aperçu");
   }
 });
+
 </script>
 
 

@@ -5,8 +5,9 @@ import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 
+import model.ConversionStore;
+
 import java.io.*;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.UUID;
@@ -19,7 +20,7 @@ import java.util.UUID;
 )
 public class ConvertServle extends HttpServlet {
 
-    private static final Path BASE_DIR = Paths.get(System.getProperty("java.io.tmpdir"), "converter");
+    private static final Path BASE_DIR   = Paths.get(System.getProperty("java.io.tmpdir"), "converter");
     private static final Path UPLOAD_DIR = BASE_DIR.resolve("uploads");
     private static final Path OUTPUT_DIR = BASE_DIR.resolve("outputs");
 
@@ -36,7 +37,7 @@ public class ConvertServle extends HttpServlet {
             return;
         }
 
-        Part part = request.getPart("file"); // FormData.append("file", ...)
+        Part part = request.getPart("file");
         if (part == null || part.getSize() == 0) {
             response.sendError(400, "Pa gen fichye (file).");
             return;
@@ -80,11 +81,11 @@ public class ConvertServle extends HttpServlet {
         }
 
         String baseName = removeExtension(originalName);
-        String downloadName = baseName + outExt; // ✅ menm non, nouvo ext
+        String downloadName = baseName + outExt;
 
-        String token = UUID.randomUUID().toString();
+        String token = UUID.randomUUID().toString().replace("-", "");
         Path uploadedPath = UPLOAD_DIR.resolve(token + "_" + originalName);
-        Path outputPath = OUTPUT_DIR.resolve(token + "_" + downloadName);
+        Path outputPath   = OUTPUT_DIR.resolve(token + "_" + downloadName);
 
         // Save upload
         try (InputStream in = part.getInputStream()) {
@@ -93,7 +94,8 @@ public class ConvertServle extends HttpServlet {
 
         // Convert
         try (InputStream in = Files.newInputStream(uploadedPath);
-             OutputStream out = Files.newOutputStream(outputPath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+             OutputStream out = Files.newOutputStream(outputPath,
+                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 
             if (conv.equals("pdfToWord")) {
                 PdfToWordConverter.convert(in, out);
@@ -101,29 +103,35 @@ public class ConvertServle extends HttpServlet {
                 WordToPdfConverter.convert(in, out);
             } else if (conv.equals("wordToExcel")) {
                 WordToExcelConverter.convertDocxToXlsx(in, out);
-            } 
+            } else if (conv.equals("pdfToExcel")) {
+                // PdfToExcelConverter.convert(in, out);
+                throw new ServletException("pdfToExcel pa implemante nan converter la.");
+            }
+        } finally {
+            // optional: delete upload file to save space
+            try { Files.deleteIfExists(uploadedPath); } catch (Exception ignored) {}
         }
 
-        // Download response
-        response.setContentType(outContentType);
-        response.setHeader("Content-Disposition", contentDisposition(downloadName));
+        // ✅ Store result for token-based download/preview
+        ConversionStore.put(new ConversionStore.Meta(token, downloadName, outContentType, outputPath));
+
+        // ✅ Return JSON (NO attachment)
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("application/json");
         response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+        response.setHeader("Pragma", "no-cache");
 
-        try (InputStream fin = Files.newInputStream(outputPath);
-             OutputStream fout = response.getOutputStream()) {
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = fin.read(buf)) != -1) fout.write(buf, 0, n);
-            fout.flush();
-        }
+        String json = "{\"success\":true,\"token\":\"" + token + "\",\"filename\":\"" + jsonEscape(downloadName) + "\"}";
+        response.getOutputStream().write(json.getBytes(StandardCharsets.UTF_8));
+        response.getOutputStream().flush();
     }
 
     private static String safeFileName(String submitted) {
         if (submitted == null) return "file";
         String name = Paths.get(submitted).getFileName().toString();
         name = name.replaceAll("[\\\\/:*?\"<>|]+", "_").trim();
-        if (name.isEmpty()) name = "file";
-        return name;
+        return name.isEmpty() ? "file" : name;
     }
 
     private static String removeExtension(String name) {
@@ -131,9 +139,8 @@ public class ConvertServle extends HttpServlet {
         return (dot > 0) ? name.substring(0, dot) : name;
     }
 
-    private static String contentDisposition(String filename) {
-        String clean = filename.replace("\"", "");
-        String encoded = URLEncoder.encode(clean, StandardCharsets.UTF_8).replace("+", "%20");
-        return "attachment; filename=\"" + clean + "\"; filename*=UTF-8''" + encoded;
+    private static String jsonEscape(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
