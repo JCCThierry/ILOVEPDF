@@ -18,7 +18,7 @@ import java.util.UUID;
         maxFileSize = 80L * 1024 * 1024,
         maxRequestSize = 90L * 1024 * 1024
 )
-public class ConvertServle extends HttpServlet {
+public class ConvertServlet extends HttpServlet {
 
     private static final Path BASE_DIR   = Paths.get(System.getProperty("java.io.tmpdir"), "converter");
     private static final Path UPLOAD_DIR = BASE_DIR.resolve("uploads");
@@ -144,3 +144,4 @@ public class ConvertServle extends HttpServlet {
         return s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
+
