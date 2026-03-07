@@ -124,151 +124,138 @@
     </div>
   </footer>
 
-  <script>
-      console.log("UI VERSION = 2026-TEST-1");
+ <script>
+  console.log("UI VERSION = 2026-FINAL-V1");
 
-let selectedFile = null;
+  let selectedFile = null;
 
-const fileName = document.getElementById("fileName");
-const conversionType = document.getElementById("conversionType");
-const form = document.getElementById("conversionForm");
-// BLOQUER TOUT SUBMIT (meme si Enter)
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  e.stopImmediatePropagation();
-  return false;
-}, true);
+  const fileName = document.getElementById("fileName");
+  const conversionType = document.getElementById("conversionType");
+  const form = document.getElementById("conversionForm");
+  const convertBtn = document.getElementById("convertBtn");
+  const previewBtn = document.getElementById("previewBtn");
 
-const previewBtn = document.getElementById("previewBtn");
+  const inputs = {
+    filePdf: document.getElementById("filePdf"),
+    fileWord: document.getElementById("fileWord"),
+    fileExcel: document.getElementById("fileExcel"),
+  };
 
-const inputs = {
-  filePdf: document.getElementById("filePdf"),
-  fileWord: document.getElementById("fileWord"),
-  fileExcel: document.getElementById("fileExcel"),
-};
-
-function resetAllInputsExcept(exceptId) {
-  Object.keys(inputs).forEach(id => {
-    if (id !== exceptId) inputs[id].value = "";
-  });
-}
-
-function getFilenameFromDisposition(cd) {
-  if (!cd) return null;
-
-  // filename*=UTF-8''...
-  const m1 = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
-  if (m1 && m1[1]) return decodeURIComponent(m1[1].trim());
-
-  // filename="..."
-  const m2 = cd.match(/filename\s*=\s*"([^"]+)"/i);
-  if (m2 && m2[1]) return m2[1].trim();
-
-  // filename=...
-  const m3 = cd.match(/filename\s*=\s*([^;]+)/i);
-  if (m3 && m3[1]) return m3[1].trim();
-
-  return null;
-}
-
-function expectedExt(conv) {
-  if (conv === "pdfToWord") return ".docx";
-  if (conv === "wordToPdf") return ".pdf";
-  if (conv === "wordToExcel") return ".xlsx";
-  if (conv === "pdfToExcel") return ".xlsx";
-  return "";
-}
-
-function baseName(name) {
-  const i = name.lastIndexOf(".");
-  return (i > 0) ? name.substring(0, i) : name;
-}
-
-function validateSelectedFile(conv, file) {
-  if (!file) return "Veuillez sélectionner un fichier";
-
-  const name = file.name.toLowerCase();
-
-  if (conv === "pdfToWord" || conv === "pdfToExcel") {
-    if (!name.endsWith(".pdf")) return "Erreur : vous devez sélectionner un fichier PDF";
-  }
-
-  if (conv === "wordToPdf" || conv === "wordToExcel") {
-    if (!(name.endsWith(".doc") || name.endsWith(".docx")))
-      return "Erreur : vous devez sélectionner un fichier Word";
-  }
-
-  return null;
-}
-
-// Quand user chwazi yon fichye (PDF/Word/Excel)
-["filePdf", "fileWord", "fileExcel"].forEach(id => {
-  inputs[id].addEventListener("change", e => {
-    resetAllInputsExcept(id);
-    selectedFile = e.target.files[0] || null;
-    fileName.textContent = selectedFile ? selectedFile.name : "No file chosen";
-  });
-});
-
-// SUBMIT: Convertir
-const convertBtn = document.getElementById("convertBtn");
-
-convertBtn.addEventListener("click", async () => {
-  const conv = conversionType.value;
-  const err = validateSelectedFile(conv, selectedFile);
-  if (err) { alert(err); return; }
-
-  const formData = new FormData();
-  formData.append("file", selectedFile);
-  formData.append("conversionType", conv);
-
-  const res = await fetch("convert", {
-    method: "POST",
-    body: formData,
-    headers: { "Accept": "application/json" }
+  // Empêcher la soumission classique du formulaire (évite le rechargement de page)
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    return false;
   });
 
-  if (!res.ok) {
-    const msg = await res.text().catch(() => "");
-    alert("Erreur lors de la conversion\n" + msg);
-    return;
+  // Réinitialise les autres inputs quand on en choisit un
+  function resetAllInputsExcept(exceptId) {
+    Object.keys(inputs).forEach(id => {
+      if (id !== exceptId) inputs[id].value = "";
+    });
   }
 
-  const data = await res.json();
-  window.location.href = "result.jsp?token=" + encodeURIComponent(data.token);
-});
+  // Validation côté client avant l'envoi
+  function validateSelectedFile(conv, file) {
+    if (!file) return "Veuillez sélectionner un fichier.";
+    const name = file.name.toLowerCase();
 
-
-// PREVIEW: Aperçu (ouvri nouvo tab)
-previewBtn.addEventListener("click", async () => {
-  const conv = conversionType.value;
-  const err = validateSelectedFile(conv, selectedFile);
-  if (err) { alert(err); return; }
-
-  const formData = new FormData();
-  formData.append("file", selectedFile);
-  formData.append("conversionType", conv);
-
-  try {
-    const res = await fetch("preview", { method: "POST", body: formData });
-
-    if (!res.ok) {
-      const msg = await res.text().catch(() => "");
-      alert("Erreur aperçu\n" + msg);
-      return;
+    if ((conv === "pdfToWord" || conv === "pdfToExcel") && !name.endsWith(".pdf")) {
+      return "Erreur : le fichier sélectionné doit être un PDF.";
     }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    // pa revoke touswit sinon tab la ka pa gen tan chaje
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
-
-  } catch (e2) {
-    alert("Erreur réseau lors de l’aperçu");
+    if ((conv === "wordToPdf" || conv === "wordToExcel") && !(name.endsWith(".doc") || name.endsWith(".docx"))) {
+      return "Erreur : le fichier sélectionné doit être un document Word.";
+    }
+    return null;
   }
-});
 
+  // Écouteurs sur les sélections de fichiers
+  ["filePdf", "fileWord", "fileExcel"].forEach(id => {
+    inputs[id].addEventListener("change", e => {
+      resetAllInputsExcept(id);
+      selectedFile = e.target.files[0] || null;
+      fileName.textContent = selectedFile ? selectedFile.name : "Aucun fichier sélectionné";
+    });
+  });
+
+  // --- ACTION : CONVERTIR ---
+  convertBtn.addEventListener("click", async () => {
+    const conv = conversionType.value;
+    const err = validateSelectedFile(conv, selectedFile);
+    if (err) { alert(err); return; }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("conversionType", conv);
+
+    try {
+      convertBtn.disabled = true;
+      convertBtn.textContent = "Conversion en cours...";
+
+      // Appel au Servlet de conversion
+      const res = await fetch("convert", {
+        method: "POST",
+        body: formData
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(msg || "Erreur lors de la conversion.");
+      }
+
+      const data = await res.json();
+
+      if (data.success && data.token) {
+        // Redirection vers le téléchargement direct via le token
+        window.location.href = "download?token=" + data.token;
+      } else {
+        alert("Le serveur n'a pas renvoyé de jeton de téléchargement.");
+      }
+
+    } catch (e) {
+      console.error(e);
+      alert("Erreur : " + e.message);
+    } finally {
+      convertBtn.disabled = false;
+      convertBtn.textContent = "Convertir";
+    }
+  });
+
+  // --- ACTION : APERÇU ---
+  previewBtn.addEventListener("click", async () => {
+    const conv = conversionType.value;
+    const err = validateSelectedFile(conv, selectedFile);
+    if (err) { alert(err); return; }
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("conversionType", conv);
+
+    try {
+      previewBtn.disabled = true;
+      previewBtn.textContent = "Chargement...";
+
+      // On convertit d'abord pour obtenir un token
+      const res = await fetch("convert", { 
+        method: "POST", 
+        body: formData 
+      });
+
+      if (!res.ok) throw new Error("Erreur lors de la préparation de l'aperçu.");
+
+      const data = await res.json();
+      
+      if (data.token) {
+        // Ouvre le PreviewServlet dans un nouvel onglet
+        window.open("preview?token=" + data.token, "_blank");
+      }
+
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      previewBtn.disabled = false;
+      previewBtn.textContent = "Aperçu";
+    }
+  });
 </script>
 
 
